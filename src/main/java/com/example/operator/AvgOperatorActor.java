@@ -1,14 +1,24 @@
-package com.example;
+package com.example.operator;
 
 import akka.actor.AbstractLoggingActor;
+import akka.actor.ActorRef;
 import akka.actor.Props;
+import com.example.SystemProcessingMain;
+import com.example.message.MaxMessage;
+import com.example.message.SensorDataMessage;
+import com.example.message.AvgMessage;
 
 import java.util.*;
+
+import static com.example.SystemProcessingMain.sys;
 
 public class AvgOperatorActor extends AbstractLoggingActor {
 
     private HashMap<String, Queue<Integer>> storedValues = new HashMap<>(); // store values here
-    private int id = 1;
+    final private int windowSize = 3;
+    final private int windowSlide = 2;
+
+    public static Vector<ActorRef> nextStep;
 
 
     @Override
@@ -18,25 +28,16 @@ public class AvgOperatorActor extends AbstractLoggingActor {
                 .build();
     }
 
-    // TODO: I don't get the part with the partitions: If prof meant to distribute the data on sight between the
-    // different instances of the same operator => we need to check the different patterns aside what he has given us
-    // another approach is just to give the different instances to check the different instances
     private void averagePayload(SensorDataMessage message) {
-        if (Constants.partitionMap.containsKey(message.getKey()) && Constants.partitionMap.get(message.getKey()) == id) {
-            mainPayload(message);
-        }
-    }
-
-    private void mainPayload(SensorDataMessage message) {
         storedValues.computeIfAbsent(message.getKey(), k -> new ArrayDeque<>()).add(message.getValue());
-        if (storedValues.get(message.getKey()).size() == Constants.windowSize) {
+        if (storedValues.get(message.getKey()).size() == windowSize) {
             Queue<Integer> values = storedValues.get(message.getKey());
             int sum = 0;
             for (Integer value : values) {
                 sum += value;
             }
 
-            for (int i = 0; i < Constants.windowSlide; i++) {
+            for (int i = 0; i < windowSlide; i++) {
                 try {
                     values.remove();
                 } catch (Exception e) {
@@ -45,8 +46,7 @@ public class AvgOperatorActor extends AbstractLoggingActor {
             }
 
             storedValues.replace(message.getKey(), values);
-
-            sender().tell(new AvgMessage(message.getKey(), (double) sum / Constants.windowSize), self());
+            nextStep.get(message.getKey().hashCode() % SystemProcessingMain.REPLICAS).tell(new AvgMessage("value", (double) sum / windowSize), this.getSelf());
         }
     }
 

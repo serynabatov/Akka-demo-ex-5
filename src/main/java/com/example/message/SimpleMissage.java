@@ -1,11 +1,10 @@
-package com.example;
+package com.example.message;
 
-public class AvgMessage {
-
+public class SimpleMissage {
     private String key;
     private double value;
 
-    public AvgMessage(String key, double value) {
+    public SimpleMissage(String key, double value) {
         this.key = key;
         this.value = value;
     }
@@ -17,4 +16,5 @@ public class AvgMessage {
     public double getValue() {
         return value;
     }
+
 }
