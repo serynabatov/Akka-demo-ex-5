@@ -5,6 +5,7 @@ import akka.actor.AllForOneStrategy;
 import akka.actor.Props;
 import akka.actor.SupervisorStrategy;
 import akka.japi.pf.DeciderBuilder;
+import com.example.exception.FaultException;
 import com.example.message.ExceptionMessage;
 
 import java.time.Duration;
@@ -15,11 +16,11 @@ public class SystemSupervisorActor extends AbstractActor {
           10,
             Duration.ofSeconds(10),
             DeciderBuilder.match(
-                    Exception.class,
+                    FaultException.class,
                     e -> SupervisorStrategy.restart()
             ).match(
                     ExceptionMessage.class,
-                    e -> (SupervisorStrategy.Directive) SupervisorStrategy.restart()
+                    e -> SupervisorStrategy.restart()
             ).build()
     );
 

@@ -1,20 +1,15 @@
 package com.example.message;
 
 public class SimpleMissage {
-    private String key;
-    private double value;
 
-    public SimpleMissage(String key, double value) {
+    private String key;
+
+    public SimpleMissage(String key) {
         this.key = key;
-        this.value = value;
     }
 
     public String getKey() {
-        return key;
-    }
-
-    public double getValue() {
-        return value;
+        return this.key;
     }
 
 }

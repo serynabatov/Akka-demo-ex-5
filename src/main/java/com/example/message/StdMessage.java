@@ -2,8 +2,11 @@ package com.example.message;
 
 public class StdMessage extends SimpleMissage{
 
+    private double value;
+
     public StdMessage(String key, double value) {
-        super(key, value);
+        super(key);
+        this.value = value;
     }
 
     public String getKey() {
@@ -11,7 +14,7 @@ public class StdMessage extends SimpleMissage{
     }
 
     public double getValue() {
-        return super.getValue();
+        return value;
     }
 
 }

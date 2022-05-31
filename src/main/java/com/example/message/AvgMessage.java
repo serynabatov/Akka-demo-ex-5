@@ -2,8 +2,12 @@ package com.example.message;
 
 public class AvgMessage extends SimpleMissage{
 
+    private double value;
+
     public AvgMessage(String key, double value) {
-        super(key, value);
+
+        super(key);
+        this.value = value;
     }
 
     public String getKey() {
@@ -11,6 +15,6 @@ public class AvgMessage extends SimpleMissage{
     }
 
     public double getValue() {
-        return super.getValue();
+        return this.value;
     }
 }

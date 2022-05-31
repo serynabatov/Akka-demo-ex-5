@@ -1,17 +1,16 @@
 package com.example.message;
 
-public class SensorDataMessage {
+public class SensorDataMessage extends SimpleMissage {
 
-    private String key;   // it says about the type of data
     private int value; // from the sensor
 
     public SensorDataMessage(String key, int value) {
-        this.key = key;
+        super(key);
         this.value = value;
     }
 
     public String getKey() {
-        return key;
+        return super.getKey();
     }
 
     public int getValue() {
