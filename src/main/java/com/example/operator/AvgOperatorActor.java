@@ -73,4 +73,8 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
         return Props.create(AvgOperatorActor.class, windowSize, windowSlide);
     }
 
+    @Override
+    public String persistenceId() {
+        return "sample-id-1";
+    }
 }
