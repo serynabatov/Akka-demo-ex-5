@@ -1,30 +1,42 @@
 package com.example.operator;
 
-import akka.actor.AbstractActor;
-import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import akka.persistence.AbstractPersistentActor;
 import akka.persistence.AbstractPersistentActorWithAtLeastOnceDelivery;
+import akka.persistence.SnapshotOffer;
 import com.example.MainPipeline;
 import com.example.exception.FaultException;
 import com.example.message.ExceptionMessage;
 import com.example.message.SensorDataMessage;
 import com.example.message.AvgMessage;
+import com.example.persistence.QueueState;
 
 import java.util.*;
 
 
 public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDelivery {
 
-    private HashMap<String, Queue<Integer>> storedValues = new HashMap<>(); // store values here
+    private QueueState state = new QueueState();
     final private int windowSize;
     final private int windowSlide;
+    private final String persistenceId;
+    private final int snapShotInterval = 1000;
 
     public static Vector<ActorRef> nextStep;
 
-        public AvgOperatorActor(int windowSize, int windowSlide) {
+    public AvgOperatorActor(int windowSize, int windowSlide, String persistenceId) {
         this.windowSize = windowSize;
         this.windowSlide = windowSlide;
+        this.persistenceId = persistenceId;
+    }
+
+    @Override
+    public Receive createReceiveRecover() {
+        return receiveBuilder()
+                .match(SensorDataMessage.class, state::update)
+                .match(SnapshotOffer.class, ss -> state = (QueueState) ss.snapshot())
+                .build();
     }
 
     @Override
@@ -35,16 +47,20 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
                 .build();
     }
 
-    @Override
-    public Receive createReceiveRecover() {
-            return null;
-    }
-
     private void averagePayload(SensorDataMessage message) {
-        storedValues.computeIfAbsent(message.getKey(), k -> new ArrayDeque<>()).add(message.getValue());
-        System.out.println(storedValues);
-        if (storedValues.get(message.getKey()).size() == windowSize) {
-            Queue<Integer> values = storedValues.get(message.getKey());
+        System.out.println(message);
+        state.update(message);
+
+        persist(message, (SensorDataMessage m) -> {
+            getContext().getSystem().getEventStream().publish(m);
+            if (lastSequenceNr() % snapShotInterval == 0 && lastSequenceNr() != 0) {
+                saveSnapshot(state.copy());
+            }
+        });
+
+        //state.update(message);
+        if (state.getSizeByKey(message) == windowSize) {
+            Queue<Integer> values = state.get(message.getKey());
             int sum = 0;
             for (Integer value : values) {
                 sum += value;
@@ -58,8 +74,7 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
                 }
             }
 
-            storedValues.replace(message.getKey(), values);
-            System.out.println((double) sum / windowSize);
+            state.replace(message, values);
             nextStep.get(message.getKey().hashCode() % MainPipeline.REPLICAS).tell(new AvgMessage(message.getKey(), (double) sum / windowSize), this.getSelf());
         }
     }
@@ -69,12 +84,12 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
         throw new FaultException();
     }
 
-    public static Props props(int windowSize, int windowSlide) {
-        return Props.create(AvgOperatorActor.class, windowSize, windowSlide);
+    public static Props props(int windowSize, int windowSlide, String persistenceId) {
+        return Props.create(AvgOperatorActor.class, windowSize, windowSlide, persistenceId);
     }
 
     @Override
     public String persistenceId() {
-        return "sample-id-1";
+        return this.persistenceId;
     }
 }

@@ -55,7 +55,7 @@ public class MainPipeline {
     public void start() throws InterruptedException, TimeoutException {
 
         for (int i = 0; i < REPLICAS; i++){
-            Future<Object> waitingAvg = ask(supervisor, AvgOperatorActor.props(windowSizeAvg, windowSlideAvg), 500);
+            Future<Object> waitingAvg = ask(supervisor, AvgOperatorActor.props(windowSizeAvg, windowSlideAvg, "add-"+i), 500);
             Future<Object> waitingMax = ask(supervisor, MaxOperatorActor.props(windowSizeMax, windowSlideMax), 500);
             Future<Object> waitingStd = ask(supervisor, StdDevOperatorActor.props(windowSizeStd, windowSlideStd), 500);
 

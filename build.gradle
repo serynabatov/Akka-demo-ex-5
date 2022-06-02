@@ -20,6 +20,7 @@ dependencies {
     implementation platform("com.typesafe.akka:akka-bom_2.13:2.6.17")
 
     implementation "com.typesafe.akka:akka-cluster-typed_2.13"
+    implementation "com.typesafe.akka:akka-persistence_2.13:2.5.32"
 
 }
 

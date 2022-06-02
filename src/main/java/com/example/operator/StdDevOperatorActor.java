@@ -10,6 +10,7 @@ import com.example.message.AvgMessage;
 import com.example.message.ExceptionMessage;
 import com.example.message.MaxMessage;
 import com.example.message.StdMessage;
+import com.example.persistence.QueueDoubleState;
 
 import java.text.DecimalFormat;
 import java.util.ArrayDeque;
@@ -18,7 +19,8 @@ import java.util.Queue;
 import java.util.Vector;
 
 public class StdDevOperatorActor extends AbstractActor {
-    private HashMap<String, Queue<Double>> storedValues = new HashMap<>(); // store values here
+    //private HashMap<String, Queue<Double>> storedValues = new HashMap<>(); // store values here
+    private QueueDoubleState state = new QueueDoubleState();
     final private int windowSize;
     final private int windowSlide;
     final private DecimalFormat df = new DecimalFormat("###.###");
@@ -38,9 +40,9 @@ public class StdDevOperatorActor extends AbstractActor {
     }
 
     private void maxPayload(AvgMessage message) {
-        storedValues.computeIfAbsent(message.getKey(), k -> new ArrayDeque<>()).add(message.getValue());
-        if (storedValues.get(message.getKey()).size() == windowSize) {
-            Queue<Double> values = storedValues.get(message.getKey());
+        state.update(message);
+        if (state.getSizeByKey(message) == windowSize) {
+            Queue<Double> values = state.get(message.getKey());
 
             double sum = 0;
             for (double value : values) {
@@ -64,7 +66,7 @@ public class StdDevOperatorActor extends AbstractActor {
                 }
             }
 
-            storedValues.replace(message.getKey(), values);
+            state.replace(message, values);
             nextStep.get(message.getKey().hashCode() % MainPipeline.REPLICAS).tell(new StdMessage("max-" + message.getKey(),
                     Double.parseDouble(df.format(dev))), this.getSelf());
         }

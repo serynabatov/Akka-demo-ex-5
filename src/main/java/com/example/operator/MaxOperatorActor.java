@@ -10,6 +10,7 @@ import com.example.message.AvgMessage;
 import com.example.message.ExceptionMessage;
 import com.example.message.MaxMessage;
 import com.example.message.StdMessage;
+import com.example.persistence.QueueDoubleState;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -19,7 +20,7 @@ import java.util.Vector;
 public class MaxOperatorActor extends AbstractActor {
 
 
-    private HashMap<String, Queue<Double>> storedValues = new HashMap<>(); // store values here
+    private QueueDoubleState state = new QueueDoubleState();
     final private int windowSize;
     final private int windowSlide;
     public static Vector<ActorRef> nextStep;
@@ -38,9 +39,9 @@ public class MaxOperatorActor extends AbstractActor {
     }
 
     private void maxPayload(StdMessage message) {
-        storedValues.computeIfAbsent(message.getKey(), k -> new ArrayDeque<>()).add(message.getValue());
-        if (storedValues.get(message.getKey()).size() == windowSize) {
-            Queue<Double> values = storedValues.get(message.getKey());
+        state.update(message);
+        if (state.getSizeByKey(message) == windowSize) {
+            Queue<Double> values = state.get(message.getKey()); //storedValues.get(message.getKey());
 
             Double maxValue = values.stream().max(Double::compare).get();
 
@@ -52,7 +53,7 @@ public class MaxOperatorActor extends AbstractActor {
                 }
             }
 
-            storedValues.replace(message.getKey(), values);
+            state.replace(message, values);
             System.out.println("Result: " + message.getKey() + " " + maxValue);
         }
     }

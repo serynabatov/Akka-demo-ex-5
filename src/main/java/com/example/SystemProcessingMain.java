@@ -4,13 +4,12 @@ import com.example.message.ExceptionMessage;
 import com.example.message.SensorDataMessage;
 import com.example.message.SimpleMissage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 public class SystemProcessingMain {
-    public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
+    public static void main(String[] args) throws InterruptedException, TimeoutException {
 
         List<SimpleMissage> messages = new ArrayList<>() {
             {
