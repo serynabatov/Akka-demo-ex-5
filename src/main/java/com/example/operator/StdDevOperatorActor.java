@@ -1,46 +1,102 @@
 package com.example.operator;
 
 import akka.actor.AbstractActor;
-import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
+import akka.actor.ActorSelection;
 import akka.actor.Props;
+import akka.persistence.*;
 import com.example.MainPipeline;
-import com.example.exception.FaultException;
-import com.example.message.AvgMessage;
-import com.example.message.ExceptionMessage;
-import com.example.message.MaxMessage;
-import com.example.message.StdMessage;
+import com.example.message.*;
 import com.example.persistence.QueueDoubleState;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import java.text.DecimalFormat;
-import java.util.ArrayDeque;
-import java.util.HashMap;
 import java.util.Queue;
 import java.util.Vector;
 
-public class StdDevOperatorActor extends AbstractActor {
-    //private HashMap<String, Queue<Double>> storedValues = new HashMap<>(); // store values here
+public class StdDevOperatorActor extends AbstractPersistentActorWithAtLeastOnceDelivery {
     private QueueDoubleState state = new QueueDoubleState();
     final private int windowSize;
     final private int windowSlide;
+    final private String persistenceId;
     final private DecimalFormat df = new DecimalFormat("###.###");
     public static Vector<ActorRef> nextStep;
 
-    public StdDevOperatorActor(int windowSize, int windowSlide) {
+    private final ActorSelection destination = getContext().actorSelection("/user/receiver");
+
+    String status;
+
+    public StdDevOperatorActor(int windowSize, int windowSlide, String persistenceId) {
         this.windowSize = windowSize;
         this.windowSlide = windowSlide;
+        this.persistenceId = persistenceId;
+    }
+
+    @Override
+    public Receive createReceiveRecover() {
+        return receiveBuilder()
+                .match(SnapshotOffer.class, this::recoverSnap)
+                .match(AvgMessage.class, this::sendRecover)
+                .match(ConfirmMessage.class, this::confirmRecover)
+                .match(RecoveryCompleted.class, this::recoverComplete)
+                .build();
+    }
+
+    private void sendRecover(AvgMessage msg) {
+        System.out.println("recover send : "+msg.getValue());
+        deliver(destination, deliveryId -> new AvgDataMessageDelivery(deliveryId, msg));
+    }
+
+    public void confirmRecover(ConfirmMessage msg) {
+        System.out.println("confirm recover: " + msg);
+        confirmDelivery(msg.deliveryId);
+    }
+
+    public void recoverSnap(SnapshotOffer snapshotOffer) {
+        @SuppressWarnings("unchecked")
+        Pair<String, AtLeastOnceDelivery.AtLeastOnceDeliverySnapshot> snapshot =
+                (Pair<String, AtLeastOnceDelivery.AtLeastOnceDeliverySnapshot>) snapshotOffer.snapshot();
+        status = snapshot.getLeft();
+        System.out.println("recover status by snapshot : "+status);
+        setDeliverySnapshot(snapshot.getRight());
+    }
+
+    public void recoverComplete(RecoveryCompleted recoveryCompleted) {
+        System.out.println("recover complete");
     }
 
     @Override
     public AbstractActor.Receive createReceive() {
         return receiveBuilder()
                 .match(AvgMessage.class, this::maxPayload)
-                .match(ExceptionMessage.class, this::exception)
+                .match(ConfirmMessage.class, this::confirmDelivery)
+                .match(SaveSnapshotSuccess.class, this::saveSnapSuc)
+                .match(AtLeastOnceDelivery.UnconfirmedWarning.class, this::unconfirm)
                 .build();
     }
 
+    public void saveSnapSuc(SaveSnapshotSuccess saveSnapshotSuccess) {
+        System.out.println("save snap suc : "+saveSnapshotSuccess);
+    }
+    public void unconfirm(AtLeastOnceDelivery.UnconfirmedWarning unconfirmedWarning) {
+        unconfirmedWarning.getUnconfirmedDeliveries().stream().forEach(ud->{
+            System.out.println("unconfirm : "+ud.message()+" : "+ud.deliveryId());
+        });
+    }
+    private void confirmDelivery(ConfirmMessage m) {
+        persist(m, (ConfirmMessage e) -> {
+            confirmDelivery(e.deliveryId);
+        } );
+    }
     private void maxPayload(AvgMessage message) {
         state.update(message);
+
+        persist(message, (AvgMessage m) -> {
+            deliver(destination, deliveryId -> new AvgDataMessageDelivery(deliveryId, m));
+        });
+
+
         if (state.getSizeByKey(message) == windowSize) {
             Queue<Double> values = state.get(message.getKey());
 
@@ -72,14 +128,13 @@ public class StdDevOperatorActor extends AbstractActor {
         }
     }
 
-    private void exception(ExceptionMessage message) throws FaultException {
-        System.out.println("Here we are emulating an error! " + message.getKey());
-        throw new FaultException();
+    public static Props props(int windowSize, int windowSlide, String persistenceId) {
+        return Props.create(StdDevOperatorActor.class, windowSize, windowSlide, persistenceId);
     }
 
-
-    public static Props props(int windowSize, int windowSlide) {
-        return Props.create(StdDevOperatorActor.class, windowSize, windowSlide);
+    @Override
+    public String persistenceId() {
+        return this.persistenceId;
     }
 
 }

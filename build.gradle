@@ -8,20 +8,24 @@ repositories {
     mavenLocal()
 }
 
+def versions = [
+        ScalaBinary: "2.13"
+]
+
+
+
 dependencies {
-  implementation 'com.typesafe.akka:akka-actor-typed_2.13:2.6.17'
   //implementation 'ch.qos.logback:logback-classic:1.2.3'
     implementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+    testImplementation 'junit:junit:4.13.1'
+    implementation 'org.apache.commons:commons-lang3:3.4'
+    implementation 'commons-io:commons-io:2.5'
+    implementation 'com.google.guava:guava:16.0.1'
+
+    implementation 'com.typesafe.akka:akka-actor_2.11:2.5.14'
+    implementation 'com.typesafe.akka:akka-persistence_2.11:2.5.14'
     testImplementation 'com.typesafe.akka:akka-actor-testkit-typed_2.13:2.6.17'
-  testImplementation 'junit:junit:4.13.1'
-    implementation group: 'com.typesafe.akka', name: 'akka-cluster-sharding_2.13', version: '2.6.17'
-    testImplementation 'junit:junit:4.13'
-
-    implementation platform("com.typesafe.akka:akka-bom_2.13:2.6.17")
-
-    implementation "com.typesafe.akka:akka-cluster-typed_2.13"
-    implementation "com.typesafe.akka:akka-persistence_2.13:2.5.32"
-
+    implementation 'org.fusesource.leveldbjni:leveldbjni-all:1.8'
 }
 
 mainClassName = "com.example.SystemProcessingMain"

@@ -1,6 +1,8 @@
 package com.example.persistence;
 
-import com.example.message.*;
+import com.example.message.AvgMessage;
+import com.example.message.SimpleMissage;
+import com.example.message.StdMessage;
 
 import java.io.Serializable;
 import java.util.ArrayDeque;

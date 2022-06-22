@@ -1,7 +1,6 @@
 package com.example.persistence;
 
 import com.example.message.SensorDataMessage;
-import com.example.message.SimpleMissage;
 
 import java.io.Serializable;
 import java.util.ArrayDeque;
