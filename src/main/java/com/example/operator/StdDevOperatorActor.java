@@ -23,7 +23,7 @@ public class StdDevOperatorActor extends AbstractPersistentActorWithAtLeastOnceD
     final private DecimalFormat df = new DecimalFormat("###.###");
     public static Vector<ActorRef> nextStep;
 
-    private final ActorSelection destination = getContext().actorSelection("/user/receiver");
+    private final ActorSelection destination;
 
     String status;
 
@@ -31,6 +31,7 @@ public class StdDevOperatorActor extends AbstractPersistentActorWithAtLeastOnceD
         this.windowSize = windowSize;
         this.windowSlide = windowSlide;
         this.persistenceId = persistenceId;
+        this.destination = getContext().actorSelection("/user/receiver-" + persistenceId.split("-")[1]);
     }
 
     @Override
@@ -44,8 +45,9 @@ public class StdDevOperatorActor extends AbstractPersistentActorWithAtLeastOnceD
     }
 
     private void sendRecover(AvgMessage msg) {
-        System.out.println("recover send : "+msg.getValue());
+        System.out.println("recover send : " + msg + " " + msg.getKey() + " " + msg.getValue());
         deliver(destination, deliveryId -> new AvgDataMessageDelivery(deliveryId, msg));
+        getContext().getSelf().tell(msg, null);
     }
 
     public void confirmRecover(ConfirmMessage msg) {

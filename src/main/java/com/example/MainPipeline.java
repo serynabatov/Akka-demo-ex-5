@@ -3,7 +3,6 @@ package com.example;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
-import akka.pattern.PatternsCS;
 import com.example.helpactor.MyDestination;
 import com.example.message.SimpleMissage;
 import com.example.operator.AvgOperatorActor;
@@ -11,7 +10,6 @@ import com.example.operator.MaxOperatorActor;
 import com.example.operator.StdDevOperatorActor;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import org.apache.commons.lang3.tuple.Triple;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import com.google.common.collect.ImmutableMap;
@@ -22,8 +20,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static akka.pattern.Patterns.ask;
@@ -80,7 +76,6 @@ public class MainPipeline {
         Config config = ConfigFactory.parseMap(configs);
 
         ActorSystem sys = ActorSystem.create("ActorSystem", config);
-        ActorRef destination = sys.actorOf(Props.create(MyDestination.class), "receiver");
         Vector<ActorRef> destinations = new Vector<>();
 
         for (int i = 0; i < REPLICAS; i++){
@@ -88,7 +83,7 @@ public class MainPipeline {
                 avgStep.add(sys.actorOf(AvgOperatorActor.props(windowSizeAvg, windowSlideAvg, "add-"+i), "add-"+i));
                 stdDevStep.add(sys.actorOf(StdDevOperatorActor.props(windowSizeStd, windowSlideStd, "std-" + i),"std-" + i));
                 maxStep.add(sys.actorOf(MaxOperatorActor.props(windowSizeMax, windowSlideMax, "max-" + i), "max-" + i));
-                destinations.add(sys.actorOf(Props.create(MyDestination.class), "receiver" + i));
+                destinations.add(sys.actorOf(Props.create(MyDestination.class), "receiver-" + i));
                 try {
                     Thread.sleep(500);
                 } catch (Exception ignored) {
@@ -114,6 +109,7 @@ public class MainPipeline {
         avgStep.clear();
         maxStep.clear();
         stdDevStep.clear();
+        destinations.clear();
 
         sys.terminate();
     }
@@ -137,16 +133,21 @@ public class MainPipeline {
                 .put("akka.actor.warn-about-java-serializer-usage", "false")
                 .put("akka.persistence.at-least-once-delivery.redeliver-interval", "1s")
                 .put("akka.persistence.at-least-once-delivery.warn-after-number-of-unconfirmed-attempts", 3)
+                /*.put("akka.actor.provider", "remote")
+                .put("akka.remote.enabled-transports", List.of("akka.remote.netty.tcp"))
+                .put("akka.remote.netty.tcp.hostname", "127.0.0.1")
+                .put("akka.remote.netty.tcp.port", 2552)*/
                 .build();
         Config config = ConfigFactory.parseMap(configs);
 
         ActorSystem sys = ActorSystem.create("ActorSystem", config);
-        ActorRef destination = sys.actorOf(Props.create(MyDestination.class), "receiver");
+        Vector<ActorRef> destinations = new Vector<>();
         for (int i = 0; i < REPLICAS; i++){
             try {
                 avgStep.add(sys.actorOf(AvgOperatorActor.props(windowSizeAvg, windowSlideAvg, "add-"+i), "add-"+i));
                 stdDevStep.add(sys.actorOf(StdDevOperatorActor.props(windowSizeStd, windowSlideStd, "std-" + i),"std-" + i));
                 maxStep.add(sys.actorOf(MaxOperatorActor.props(windowSizeMax, windowSlideMax, "max-" + i), "max-" + i));
+                destinations.add(sys.actorOf(Props.create(MyDestination.class), "receiver-" + i));
                 try {
                     Thread.sleep(500);
                 } catch (Exception ignored) {
@@ -181,14 +182,31 @@ public class MainPipeline {
         avgStep.clear();
         stdDevStep.clear();
         maxStep.clear();
+        destinations.clear();
+
+//        Map<String, Object> configs2 = ImmutableMap.<String, Object>builder()
+//                .put("akka.persistence.journal.plugin", "akka.persistence.journal.leveldb")
+//                .put("akka.persistence.snapshot-store.plugin", "akka.persistence.snapshot-store.local")
+//                .put("akka.persistence.journal.leveldb.dir", "akka/persistence/journal")
+//                .put("akka.persistence.snapshot-store.local.dir", "akka/persistence/snapshots")
+//                .put("akka.actor.warn-about-java-serializer-usage", "false")
+//                .put("akka.persistence.at-least-once-delivery.redeliver-interval", "1s")
+//                .put("akka.persistence.at-least-once-delivery.warn-after-number-of-unconfirmed-attempts", 3)
+//                .put("akka.actor.provider", "remote")
+//                .put("akka.remote.enabled-transports", List.of("akka.remote.netty.tcp"))
+//                .put("akka.remote.netty.tcp.hostname", "127.0.0.1")
+//                .put("akka.remote.netty.tcp.port", 2652)
+//                .build();
+
+        config = ConfigFactory.parseMap(configs);
 
         sys = ActorSystem.create("ActorSystem", config);
-        destination = sys.actorOf(Props.create(MyDestination.class), "receiver");
         for (int i = 0; i < REPLICAS; i++){
             try {
                 avgStep.add(sys.actorOf(AvgOperatorActor.props(windowSizeAvg, windowSlideAvg, "add-"+i), "add-"+i));
                 stdDevStep.add(sys.actorOf(StdDevOperatorActor.props(windowSizeStd, windowSlideStd, "std-" + i),"std-" + i));
                 maxStep.add(sys.actorOf(MaxOperatorActor.props(windowSizeMax, windowSlideMax, "max-" + i), "max-" + i));
+                destinations.add(sys.actorOf(Props.create(MyDestination.class), "receiver-" + i));
                 try {
                     Thread.sleep(500);
                 } catch (Exception ignored) {
@@ -200,10 +218,10 @@ public class MainPipeline {
         AvgOperatorActor.nextStep = stdDevStep;
         StdDevOperatorActor.nextStep = maxStep;
 
-        for (SimpleMissage message : sensors) {
+        for (int i = k; i < sensors.size(); i++) {
             try {
-                Future<Object> future = ask(avgStep.get(message.getKey().hashCode() % REPLICAS),
-                        message, 1000);
+                Future<Object> future = ask(avgStep.get(sensors.get(i).getKey().hashCode() % REPLICAS),
+                        sensors.get(i), 1000);
                 future.result(timeout, null);
             } catch (Exception ignored) {
             }
@@ -213,7 +231,7 @@ public class MainPipeline {
         avgStep.clear();
         stdDevStep.clear();
         maxStep.clear();
-
+        destinations.clear();
     }
 
 }

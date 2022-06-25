@@ -19,7 +19,7 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
     final private int windowSlide;
     String status;
 
-    private final ActorSelection destination = getContext().actorSelection("/user/receiver");
+    private final ActorSelection destination;
 
     private final String persistenceId;
 
@@ -29,6 +29,7 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
         this.windowSize = windowSize;
         this.windowSlide = windowSlide;
         this.persistenceId = persistenceId;
+        this.destination = getContext().actorSelection("/user/receiver-" + persistenceId.split("-")[1]);
     }
 
     @Override
@@ -43,8 +44,9 @@ public class AvgOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
 
 
     private void sendRecover(SensorDataMessage msg) {
-        System.out.println("recover send : "+msg.getValue());
+        System.out.println("recover send : " + msg + " " + msg.getKey() + " " + msg.getValue());
         deliver(destination, deliveryId -> new SensorDataMessageDelivery(deliveryId, msg));
+        getContext().getSelf().tell(msg, null);
     }
     public void confirmRecover(ConfirmMessage msg) {
         System.out.println("confirm recover: " + msg);

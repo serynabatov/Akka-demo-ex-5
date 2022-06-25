@@ -3,6 +3,7 @@ package com.example.operator;
 import akka.actor.ActorSelection;
 import akka.actor.Props;
 import akka.persistence.*;
+import com.example.MainPipeline;
 import com.example.message.*;
 import com.example.persistence.QueueDoubleState;
 import org.apache.commons.lang3.tuple.Pair;
@@ -17,13 +18,14 @@ public class MaxOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
     final private int windowSlide;
     String status;
     private final String persistenceId;
-    private final ActorSelection destination = getContext().actorSelection("/user/receiver");
+    private final ActorSelection destination;
 
 
     public MaxOperatorActor(int windowSize, int windowSlide, String persistenceId) {
         this.windowSlide = windowSlide;
         this.windowSize = windowSize;
         this.persistenceId = persistenceId;
+        this.destination = getContext().actorSelection("/user/receiver-" + persistenceId.split("-")[1]);
     }
 
     @Override
@@ -36,9 +38,11 @@ public class MaxOperatorActor extends AbstractPersistentActorWithAtLeastOnceDeli
                 .build();
     }
     private void sendRecover(StdMessage msg) {
-        System.out.println("recover send : "+msg.getValue());
+        System.out.println("recover send : " + msg + " " + msg.getKey() + " " + msg.getValue());
         deliver(destination, deliveryId -> new StdDataMessageDelivery(deliveryId, msg));
+        getContext().getSelf().tell(msg, null);
     }
+
     public void confirmRecover(ConfirmMessage msg) {
         System.out.println("confirm recover: " + msg);
         confirmDelivery(msg.deliveryId);
